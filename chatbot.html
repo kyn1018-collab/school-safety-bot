@@ -326,12 +326,50 @@ function sendSuggestion(text) {
   sendMessage();
 }
 
+async function callGeminiAPI(body, retryCount = 0) {
+  const MAX_RETRIES = 3;
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+  );
+  const data = await res.json();
+
+  if (data.error) {
+    const errMsg = data.error.message || '';
+    // 429 Quota exceeded → 자동 재시도
+    if (res.status === 429 && retryCount < MAX_RETRIES) {
+      // 응답에서 "Please retry in Xs" 파싱
+      const match = errMsg.match(/retry in ([\d.]+)s/i);
+      const waitSec = match ? Math.ceil(parseFloat(match[1])) + 1 : 15;
+
+      // 카운트다운 표시
+      const typingEl = document.getElementById('typing-indicator');
+      let remaining = waitSec;
+      const timer = setInterval(() => {
+        if (typingEl) {
+          typingEl.querySelector('.bubble').innerHTML =
+            `⏳ 잠시 후 자동으로 재시도합니다... (${remaining}초)`;
+        }
+        remaining--;
+        if (remaining < 0) clearInterval(timer);
+      }, 1000);
+
+      await new Promise(r => setTimeout(r, waitSec * 1000));
+      clearInterval(timer);
+      if (typingEl) typingEl.querySelector('.bubble').innerHTML =
+        `<span></span><span></span><span></span>`;
+
+      return callGeminiAPI(body, retryCount + 1);
+    }
+    throw new Error(errMsg);
+  }
+  return data;
+}
+
 async function sendMessage() {
   const input = document.getElementById('msg-input');
   const text = input.value.trim();
   if (!text) return;
-
-
 
   removeWelcome();
   input.value = '';
@@ -348,28 +386,20 @@ async function sendMessage() {
       generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
     };
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-    );
-
-    const data = await res.json();
+    const data = await callGeminiAPI(body);
     hideTyping();
-
-    if (data.error) throw new Error(data.error.message);
 
     const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '응답을 받을 수 없습니다.';
     messages.push({ role: 'model', parts: [{ text: reply }] });
     appendMessage('bot', reply);
 
-    // Save to history
     if (messages.length === 2) {
       historyList.unshift({ title: text.substring(0, 18) + '...', msgs: [...messages] });
       updateHistoryUI();
     }
   } catch (err) {
     hideTyping();
-    appendMessage('bot', '오류가 발생했습니다: ' + err.message);
+    appendMessage('bot', '⚠️ 오류: ' + err.message + '\n\n잠시 후 다시 시도해 주세요.');
   } finally {
     document.getElementById('send-btn').disabled = false;
   }
