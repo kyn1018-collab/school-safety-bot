@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>학교폭력 도우미</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f0f9ff; height: 100vh; display: flex; }
+
+  /* Sidebar */
+  #sidebar {
+    width: 260px; background: #fff; border-right: 1px solid #e0f2fe;
+    display: flex; flex-direction: column; padding: 0; min-height: 100vh;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+  }
+  #sidebar-header {
+    padding: 20px 16px; border-bottom: 1px solid #e0f2fe;
+    display: flex; align-items: center; gap: 10px;
+  }
+  #sidebar-header h2 { font-size: 15px; color: #0c4a6e; font-weight: 700; }
+  #new-chat-btn {
+    margin: 14px; padding: 10px; background: #0ea5e9; color: #fff;
+    border: none; border-radius: 10px; cursor: pointer; font-size: 14px;
+    font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: background 0.2s;
+  }
+  #new-chat-btn:hover { background: #0284c7; }
+  #history-title { font-size: 11px; color: #94a3b8; padding: 0 16px 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  #history-list { flex: 1; overflow-y: auto; padding: 0 8px; }
+  .history-item {
+    padding: 10px; border-radius: 8px; cursor: pointer; font-size: 13px;
+    color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .history-item:hover { background: #f0f9ff; }
+  #api-key-section { padding: 12px; border-top: 1px solid #e0f2fe; background: #f8fafc; }
+  #api-key-section label { font-size: 11px; color: #64748b; font-weight: 600; display: block; margin-bottom: 5px; }
+  #api-key-input {
+    width: 100%; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 8px;
+    font-size: 12px; outline: none;
+  }
+  #api-key-input:focus { border-color: #0ea5e9; }
+  #save-key-btn {
+    width: 100%; margin-top: 6px; padding: 7px; background: #0ea5e9; color: #fff;
+    border: none; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600;
+  }
+  #save-key-btn:hover { background: #0284c7; }
+  #key-status { font-size: 11px; margin-top: 4px; color: #22c55e; display: none; }
+
+  /* Main */
+  #main { flex: 1; display: flex; flex-direction: column; height: 100vh; background: #fff; }
+  #header {
+    padding: 14px 24px; border-bottom: 1px solid #e0f2fe;
+    background: rgba(255,255,255,0.9); backdrop-filter: blur(8px);
+    display: flex; align-items: center; gap: 12px;
+  }
+  #header .shield { color: #0ea5e9; font-size: 22px; }
+  #header h1 { font-size: 16px; color: #0c4a6e; font-weight: 700; }
+  #header p { font-size: 11px; color: #0ea5e9; }
+
+  /* Chat area */
+  #chat-area { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+  #welcome {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; gap: 20px;
+  }
+  #welcome .icon-wrap {
+    width: 72px; height: 72px; background: #e0f2fe; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 32px;
+  }
+  #welcome h2 { font-size: 22px; color: #1e293b; font-weight: 700; }
+  #welcome p { font-size: 14px; color: #64748b; max-width: 380px; line-height: 1.6; }
+  #suggestions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 600px; }
+  .suggestion-btn {
+    background: #fff; border: 1px solid #e0f2fe; border-radius: 14px; padding: 16px;
+    cursor: pointer; text-align: left; transition: all 0.2s;
+  }
+  .suggestion-btn:hover { border-color: #0ea5e9; box-shadow: 0 4px 12px rgba(14,165,233,0.1); }
+  .suggestion-btn .icon { font-size: 20px; margin-bottom: 8px; }
+  .suggestion-btn strong { display: block; font-size: 13px; color: #1e293b; margin-bottom: 4px; }
+  .suggestion-btn span { font-size: 11px; color: #94a3b8; }
+
+  /* Messages */
+  .msg { display: flex; gap: 10px; max-width: 800px; margin: 0 auto; width: 100%; }
+  .msg.user { justify-content: flex-end; }
+  .bubble {
+    max-width: 80%; padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.65;
+  }
+  .msg.user .bubble { background: #0ea5e9; color: #fff; border-bottom-right-radius: 4px; }
+  .msg.bot .bubble {
+    background: #f8fafc; border: 1px solid #e2e8f0; color: #1e293b;
+    border-bottom-left-radius: 4px; white-space: pre-wrap;
+  }
+  .msg.bot .bubble strong { color: #0c4a6e; }
+  .typing { display: flex; gap: 5px; padding: 14px 18px; }
+  .typing span {
+    width: 8px; height: 8px; background: #94a3b8; border-radius: 50%;
+    animation: bounce 1.2s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-8px); }
+  }
+
+  /* Input */
+  #input-area {
+    padding: 14px 24px; border-top: 1px solid #e0f2fe; background: #fff;
+  }
+  #input-row {
+    display: flex; gap: 10px; align-items: center; max-width: 800px; margin: 0 auto;
+    background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 50px; padding: 6px 6px 6px 20px;
+  }
+  #input-row:focus-within { border-color: #0ea5e9; background: #fff; }
+  #msg-input {
+    flex: 1; border: none; background: transparent; font-size: 14px; outline: none; color: #1e293b;
+  }
+  #send-btn {
+    width: 38px; height: 38px; background: #0ea5e9; border: none; border-radius: 50%;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s;
+  }
+  #send-btn:hover { background: #0284c7; }
+  #send-btn:disabled { background: #bae6fd; cursor: not-allowed; }
+  #send-btn svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2; }
+  #disclaimer { text-align: center; font-size: 11px; color: #94a3b8; margin-top: 8px; }
+
+  @media (max-width: 640px) {
+    #sidebar { display: none; }
+    #suggestions { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <span style="font-size:22px;">🛡️</span>
+    <h2>학교폭력 도우미</h2>
+  </div>
+  <button id="new-chat-btn" onclick="newChat()">＋ 새 대화 시작</button>
+  <div id="history-title">이전 대화 목록</div>
+  <div id="history-list"><p style="font-size:12px;color:#94a3b8;padding:8px;">저장된 대화가 없습니다.</p></div>
+  <div id="api-key-section">
+    <div style="font-size:11px;color:#22c55e;padding:4px 0;">✅ API 연결 완료</div>
+    <div style="font-size:10px;color:#94a3b8;">Gemini 2.0 Flash 모델 사용 중</div>
+  </div>
+</div>
+
+<!-- Main -->
+<div id="main">
+  <div id="header">
+    <span class="shield">🛡️</span>
+    <div>
+      <h1>학교폭력 도우미 AI</h1>
+      <p>법령 기반 신뢰할 수 있는 답변</p>
+    </div>
+  </div>
+
+  <div id="chat-area">
+    <div id="welcome">
+      <div class="icon-wrap">🛡️</div>
+      <h2>무엇을 도와드릴까요?</h2>
+      <p>학교폭력 관련 법령, 가이드북, 매뉴얼을 기반으로 정확하고 신뢰할 수 있는 정보를 제공합니다.</p>
+      <div id="suggestions">
+        <button class="suggestion-btn" onclick="sendSuggestion('학부모입니다. 자녀가 학교폭력을 당한 것 같은데 초기 대응 절차를 알려주세요.')">
+          <div class="icon">⚠️</div>
+          <strong>학부모용 초기 대응</strong>
+          <span>피해 의심 시 대처 및 신고 방법 안내</span>
+        </button>
+        <button class="suggestion-btn" onclick="sendSuggestion('담임 교사입니다. 학교폭력 사안을 인지했을 때의 처리 매뉴얼을 알려주세요.')">
+          <div class="icon">📖</div>
+          <strong>교사용 사안 처리 매뉴얼</strong>
+          <span>사안 인지 시 보고 및 조치 절차</span>
+        </button>
+        <button class="suggestion-btn" onclick="sendSuggestion('학교폭력대책심의위원회는 어떻게 구성되고 운영되나요?')">
+          <div class="icon">⚖️</div>
+          <strong>심의위원회 구성·운영</strong>
+          <span>학폭위 운영 절차 및 구성 안내</span>
+        </button>
+        <button class="suggestion-btn" onclick="sendSuggestion('학교폭력 가해학생에게 내릴 수 있는 조치의 종류는 무엇인가요?')">
+          <div class="icon">📋</div>
+          <strong>가해학생 조치 종류</strong>
+          <span>법령에 따른 조치 유형 확인</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="input-area">
+    <div id="input-row">
+      <input type="text" id="msg-input" placeholder="학교폭력 관련 법령이나 대처법에 대해 질문해보세요..." onkeydown="if(event.key==='Enter') sendMessage()">
+      <button id="send-btn" onclick="sendMessage()">
+        <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      </button>
+    </div>
+    <div id="disclaimer">AI의 답변은 참고용이며, 실제 법적 효력을 갖지 않습니다.</div>
+  </div>
+</div>
+
+<script>
+const SYSTEM_PROMPT = `당신은 한국 초등학교 학교폭력 대응을 위한 '학교폭력 도우미' 챗봇입니다.
+반드시 아래 제공된 법령 및 가이드북 자료를 기반으로만 답변하세요.
+제공된 자료에 없는 내용은 "해당 내용은 법령을 직접 참고하시기 바랍니다."라고 안내하세요(Hallucination 방지).
+답변 끝에는 반드시 참조한 법령 또는 가이드북의 조항/출처를 명시하세요.
+학부모/교사 질문을 구분하여 각 입장에 맞는 실무 절차를 우선 안내하세요.
+
+[지식 베이스]
+학교폭력예방 및 대책에 관한 법률 주요 조항:
+
+제1조(목적) 이 법은 학교폭력의 예방과 대책에 필요한 사항을 규정함으로써 피해학생의 보호, 가해학생의 선도·교육 및 피해학생과 가해학생 간의 분쟁조정을 통하여 학생의 인권을 보호하고 학생을 건전한 사회구성원으로 육성함을 목적으로 한다.
+
+제2조(정의) "학교폭력"이란 학교 내외에서 학생을 대상으로 발생한 상해, 폭행, 감금, 협박, 약취·유인, 명예훼손·모욕, 공갈, 강요·강제적인 심부름 및 성폭력, 따돌림, 사이버 따돌림, 정보통신망을 이용한 음란·폭력 정보 등에 의하여 신체·정신 또는 재산상의 피해를 수반하는 행위를 말한다.
+
+제17조(가해학생에 대한 조치) 심의위원회는 피해학생의 보호와 가해학생의 선도·교육을 위하여 가해학생에 대하여 다음 각 호의 어느 하나에 해당하는 조치를 할 것을 학교의 장에게 요청하여야 한다.
+1. 피해학생에 대한 서면사과
+2. 피해학생 및 신고·고발 학생에 대한 접촉, 협박 및 보복행위의 금지
+3. 학교에서의 봉사
+4. 사회봉사
+5. 학내외 전문가에 의한 특별 교육이수 또는 심리치료
+6. 출석정지
+7. 학급교체
+8. 전학
+9. 퇴학처분
+
+제16조(피해학생의 보호) 심의위원회는 피해학생의 보호를 위하여 필요하다고 인정하는 때에는 피해학생에 대하여 다음 각 호의 어느 하나에 해당하는 조치를 할 것을 학교의 장에게 요청할 수 있다.
+1. 학내외 전문가에 의한 심리상담 및 조언
+2. 일시보호
+3. 치료 및 치료를 위한 요양
+4. 학급교체
+5. 전학 권유
+6. 그 밖에 피해학생의 보호를 위하여 필요한 조치
+
+제14조(전담기구의 운영) 학교의 장은 학교폭력 사태를 인지한 경우 즉시 전담기구 또는 소속 교원으로 하여금 사실 확인을 위한 조사를 하게 하고, 그 결과를 보고받아야 한다.
+
+[사안처리 절차 - 교사용 매뉴얼]
+1. 사안 인지 즉시 피해·가해학생 분리 조치
+2. 학교장 및 교감 즉시 보고
+3. 피해학생 보호자 및 가해학생 보호자 통보(사안 인지 즉시)
+4. 성폭력 등 중대 사안은 즉시 수사기관(경찰) 신고 의무
+5. 학교폭력 전담기구 구성 및 사실 조사 실시
+6. 조사 결과를 교육지원청 심의위원회에 요청
+7. 심의위원회 결정에 따른 조치 이행
+
+[사안처리 절차 - 학부모용 가이드]
+1. 자녀의 피해 징후 발견 시 담임교사 또는 학교폭력 전담기구에 즉시 신고
+2. 증거 확보: 메신저 캡처, 녹음, 사진, 진단서 등
+3. Wee센터(117), 경찰청(112), 교육부 상담전화(1396) 이용 가능
+4. 학교가 미조치 시 교육지원청에 직접 신고 가능
+5. 심의위원회 개최 요구권 보장
+
+[심의위원회 운영 절차]
+- 학교폭력대책심의위원회는 교육지원청에 설치·운영
+- 재적위원 과반수 출석, 출석위원 과반수 찬성으로 의결
+- 피해학생·가해학생·보호자 진술 기회 보장
+- 조치 결정 후 학교의 장에게 통보, 이행 의무`;
+
+let messages = [];
+let historyList = [];
+const apiKey = 'AIzaSyDfY21jOgAPKi_Z9QwJPBFbM-rTmQl5XBY';
+
+window.onload = () => { /* API key is pre-configured */ };
+
+function saveApiKey() { /* no-op: key is pre-configured */ }
+
+function newChat() {
+  messages = [];
+  document.getElementById('chat-area').innerHTML = '';
+  const welcome = document.createElement('div');
+  welcome.id = 'welcome';
+  welcome.innerHTML = `
+    <div class="icon-wrap">🛡️</div>
+    <h2>무엇을 도와드릴까요?</h2>
+    <p>학교폭력 관련 법령, 가이드북, 매뉴얼을 기반으로 정확하고 신뢰할 수 있는 정보를 제공합니다.</p>
+    <div id="suggestions">
+      <button class="suggestion-btn" onclick="sendSuggestion('학부모입니다. 자녀가 학교폭력을 당한 것 같은데 초기 대응 절차를 알려주세요.')">
+        <div class="icon">⚠️</div><strong>학부모용 초기 대응</strong><span>피해 의심 시 대처 및 신고 방법 안내</span>
+      </button>
+      <button class="suggestion-btn" onclick="sendSuggestion('담임 교사입니다. 학교폭력 사안을 인지했을 때의 처리 매뉴얼을 알려주세요.')">
+        <div class="icon">📖</div><strong>교사용 사안 처리 매뉴얼</strong><span>사안 인지 시 보고 및 조치 절차</span>
+      </button>
+      <button class="suggestion-btn" onclick="sendSuggestion('학교폭력대책심의위원회는 어떻게 구성되고 운영되나요?')">
+        <div class="icon">⚖️</div><strong>심의위원회 구성·운영</strong><span>학폭위 운영 절차 및 구성 안내</span>
+      </button>
+      <button class="suggestion-btn" onclick="sendSuggestion('학교폭력 가해학생에게 내릴 수 있는 조치의 종류는 무엇인가요?')">
+        <div class="icon">📋</div><strong>가해학생 조치 종류</strong><span>법령에 따른 조치 유형 확인</span>
+      </button>
+    </div>`;
+  document.getElementById('chat-area').appendChild(welcome);
+}
+
+function removeWelcome() {
+  const w = document.getElementById('welcome');
+  if (w) w.remove();
+}
+
+function appendMessage(role, text) {
+  const area = document.getElementById('chat-area');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `<div class="bubble">${text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</div>`;
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+  return div;
+}
+
+function showTyping() {
+  const area = document.getElementById('chat-area');
+  const div = document.createElement('div');
+  div.className = 'msg bot';
+  div.id = 'typing-indicator';
+  div.innerHTML = `<div class="bubble typing"><span></span><span></span><span></span></div>`;
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+}
+
+function hideTyping() {
+  const t = document.getElementById('typing-indicator');
+  if (t) t.remove();
+}
+
+function sendSuggestion(text) {
+  document.getElementById('msg-input').value = text;
+  sendMessage();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+
+
+  removeWelcome();
+  input.value = '';
+  appendMessage('user', text);
+  messages.push({ role: 'user', parts: [{ text }] });
+
+  document.getElementById('send-btn').disabled = true;
+  showTyping();
+
+  try {
+    const body = {
+      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: messages,
+      generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
+    };
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    );
+
+    const data = await res.json();
+    hideTyping();
+
+    if (data.error) throw new Error(data.error.message);
+
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '응답을 받을 수 없습니다.';
+    messages.push({ role: 'model', parts: [{ text: reply }] });
+    appendMessage('bot', reply);
+
+    // Save to history
+    if (messages.length === 2) {
+      historyList.unshift({ title: text.substring(0, 18) + '...', msgs: [...messages] });
+      updateHistoryUI();
+    }
+  } catch (err) {
+    hideTyping();
+    appendMessage('bot', '오류가 발생했습니다: ' + err.message);
+  } finally {
+    document.getElementById('send-btn').disabled = false;
+  }
+}
+
+function updateHistoryUI() {
+  const list = document.getElementById('history-list');
+  list.innerHTML = historyList.map((h, i) => `
+    <div class="history-item" onclick="loadHistory(${i})">💬 ${h.title}</div>
+  `).join('');
+}
+
+function loadHistory(i) {
+  const h = historyList[i];
+  messages = [...h.msgs];
+  document.getElementById('chat-area').innerHTML = '';
+  messages.forEach(m => appendMessage(m.role === 'user' ? 'user' : 'bot', m.parts[0].text));
+}
+</script>
+</body>
+</html>
