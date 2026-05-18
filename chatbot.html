@@ -336,7 +336,7 @@ async function callGroqAPI(messagesBody, retryCount = 0) {
       'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: 'llama3-70b-8192',
+      model: 'llama-3.3-70b-versatile',
       messages: messagesBody,
       temperature: 0.3,
       max_tokens: 1024
