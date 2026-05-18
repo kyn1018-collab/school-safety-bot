@@ -328,21 +328,26 @@ function sendSuggestion(text) {
 
 async function callGeminiAPI(body, retryCount = 0) {
   const MAX_RETRIES = 3;
+  // 모델을 gemini-1.5-flash로 변경 (무료 할당량 문제 우회 시도)
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
   );
   const data = await res.json();
 
   if (data.error) {
     const errMsg = data.error.message || '';
-    // 429 Quota exceeded → 자동 재시도
+    
+    // limit: 0 인 경우 무료 할당량이 아예 없는 상태(지역 제한 등)이므로 재시도하지 않음
+    if (res.status === 429 && errMsg.includes('limit: 0')) {
+      throw new Error("API 키의 무료 할당량이 0입니다. (원인: 해당 지역 무료 티어 미지원 또는 결제 미등록). Google AI Studio에서 결제 계정을 연결해야 사용할 수 있습니다.");
+    }
+
+    // 429 Quota exceeded (일시적 초과) → 자동 재시도
     if (res.status === 429 && retryCount < MAX_RETRIES) {
-      // 응답에서 "Please retry in Xs" 파싱
       const match = errMsg.match(/retry in ([\d.]+)s/i);
       const waitSec = match ? Math.ceil(parseFloat(match[1])) + 1 : 15;
 
-      // 카운트다운 표시
       const typingEl = document.getElementById('typing-indicator');
       let remaining = waitSec;
       const timer = setInterval(() => {
